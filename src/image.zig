@@ -1,13 +1,25 @@
-const c = @cImport({
-    @cInclude("FreeImage.h");
-});
+const c = @import("c.zig").imported;
 
 pub const Image = struct {
     bitmap: *c.FIBITMAP,
     format: c.FREE_IMAGE_FORMAT,
 
+    pub fn loadFromFile(path: [*:0]const u8) !Image {
+        const format = c.FreeImage_GetFileType(path, 0);
+        const bitmap = c.FreeImage_Load(format, path, 0) orelse return error.ImageOpenError;
+
+        return Image{
+            .bitmap = bitmap,
+            .format = format,
+        };
+    }
+
     pub fn unload(self: Image) void {
         c.FreeImage_Unload(self.bitmap);
+    }
+
+    pub fn saveToFile(self: Image, path: [*:0]const u8) void {
+        _ = c.FreeImage_Save(self.format, self.bitmap, path, 0);
     }
 
     pub fn getWidth(self: Image) c_uint {
@@ -42,17 +54,3 @@ pub const Image = struct {
         return c.FreeImage_GetPitch(self.bitmap);
     }
 };
-
-pub fn loadImage(path: [*:0]const u8) !Image {
-    const format = c.FreeImage_GetFileType(path, 0);
-    const bitmap = c.FreeImage_Load(format, path, 0) orelse return error.ImageOpenError;
-
-    return Image{
-        .bitmap = bitmap,
-        .format = format,
-    };
-}
-
-pub fn saveImage(image: Image, path: [*:0]const u8) void {
-    _ = c.FreeImage_Save(image.format, image.bitmap, path, 0);
-}
