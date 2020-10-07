@@ -20,13 +20,12 @@ pub fn readAndParse() ArgsError!Args {
         return ArgsError.AllocationFailed;
     };
 
-    // TODO: print usage
     if (args.len < 2) {
-        std.debug.print("Input filename is required.\n", .{});
+        std.debug.print("Input filename is required.\n{}\n", .{usage()});
         return ArgsError.NoInputFilename;
     }
     if (args.len > 3) {
-        std.debug.print("Too many arguments.\n", .{});
+        std.debug.print("Too many arguments.\n{}\n", .{usage()});
         return ArgsError.TooManyArgs;
     }
 
@@ -50,7 +49,7 @@ fn validateArgs(args: Args) bool {
     };
 
     if (!img.isSupportedRead(args.inputFilename)) {
-        std.debug.print("{} is not supported\n", .{args.inputFilename});
+        std.debug.print("{}: reading is not supported\n", .{args.inputFilename});
         return false;
     }
 
@@ -62,7 +61,7 @@ fn validateArgs(args: Args) bool {
         }
 
         if (!img.isSupportedWrite(path)) {
-            std.debug.print("{} is not supported\n", .{path});
+            std.debug.print("{}: writing is not supported\n", .{path});
             return false;
         }
     }
@@ -85,22 +84,18 @@ fn tryWriteFile(path: []const u8) bool {
         std.os.AccessError.FileNotFound => {
             if (std.fs.path.isAbsolute(path)) {
                 const file = std.fs.createFileAbsolute(path, .{}) catch {
-                    std.debug.print("can't create file\n", .{});
                     return false;
                 };
                 file.close();
                 std.fs.deleteFileAbsolute(path) catch {
-                    std.debug.print("can't delete file\n", .{});
                     return false;
                 };
             } else {
                 const file = std.fs.cwd().createFile(path, .{}) catch {
-                    std.debug.print("can't create file\n", .{});
                     return false;
                 };
                 file.close();
                 std.fs.cwd().deleteFile(path) catch {
-                    std.debug.print("can't delete file\n", .{});
                     return false;
                 };
             }
@@ -108,12 +103,14 @@ fn tryWriteFile(path: []const u8) bool {
             return true;
         },
         else => {
-            std.debug.print("some error on access\n", .{});
             return false;
         },
     };
 
     // We can access file which means it exists - don't overwrite it!
-    std.debug.print("file already exists\n", .{});
     return false;
+}
+
+fn usage() []const u8 {
+    return "Usage: imged INPUT_FILE [OUTPUT_FILE]";
 }
