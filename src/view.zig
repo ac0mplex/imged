@@ -1,3 +1,4 @@
+const allocator = @import("allocator.zig");
 const c = @import("c.zig").imported;
 const img = @import("image.zig");
 const std = @import("std");
@@ -19,10 +20,36 @@ pub const DrawableTexture = struct {
             image.getRedMask(),
             image.getGreenMask(),
             image.getBlueMask(),
-            // TODO: How to handle transparency
-            0x000000ff,
+            if (image.has_alpha) 0xFF else 0,
         );
         defer c.SDL_FreeSurface(surface);
+
+        if (image.palette) |image_palette| {
+            var palette_colors = allocator.get().alloc(c.SDL_Color, image_palette.size) catch {
+                unreachable;
+            };
+            defer allocator.get().free(palette_colors);
+
+            var i: usize = 0;
+            while (i < palette_colors.len) {
+                const color = image_palette.getAt(i);
+                palette_colors[i].r = color.r;
+                palette_colors[i].g = color.g;
+                palette_colors[i].b = color.b;
+                i += 1;
+            }
+
+            var result = c.SDL_SetPaletteColors(
+                surface.*.format.*.palette,
+                @ptrCast([*c]const c.SDL_Color, palette_colors),
+                0,
+                @intCast(c_int, palette_colors.len),
+            );
+
+            if (result != 0) {
+                return error.FailedToSetPaletteColors;
+            }
+        }
 
         var texture = c.SDL_CreateTextureFromSurface(renderer, surface) orelse {
             return error.TextureCreationFailed;

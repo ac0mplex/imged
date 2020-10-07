@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const c = @import("c.zig").imported;
+const cli_args = @import("cli_args.zig");
 const img = @import("image.zig");
 const view = @import("view.zig");
 
@@ -37,6 +38,10 @@ const App = struct {
 };
 
 pub fn main() anyerror!void {
+    const args = cli_args.readAndParse() catch {
+        return;
+    };
+
     if (c.SDL_Init(c.SDL_INIT_VIDEO) != 0) {
         c.SDL_Log("Failed to initialize SDL: %s", c.SDL_GetError());
         return error.InitFailed;
@@ -55,9 +60,8 @@ pub fn main() anyerror!void {
     };
     defer c.SDL_DestroyRenderer(renderer);
 
-    const path = "zig-cache/bin/test.jpg";
-    const image = Image.loadFromFile(path) catch {
-        std.debug.warn("Failed opening {}\n", .{path});
+    const image = img.Image.loadFromFile(args.inputFilename) catch {
+        std.debug.warn("Failed opening {}\n", .{args.inputFilename});
         return error.InitFailed;
     };
     defer image.unload();
@@ -81,5 +85,7 @@ pub fn main() anyerror!void {
         app.draw();
     }
 
-    image.saveToFile("output_image");
+    if (args.outputFilename) |path| {
+        image.saveToFile(path);
+    }
 }
