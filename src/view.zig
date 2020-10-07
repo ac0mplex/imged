@@ -20,7 +20,7 @@ pub const DrawableTexture = struct {
             image.getRedMask(),
             image.getGreenMask(),
             image.getBlueMask(),
-            if (image.has_alpha) 0xFF else 0,
+            if (image.has_alpha) img.getAlphaMask() else 0,
         );
         defer c.SDL_FreeSurface(surface);
 

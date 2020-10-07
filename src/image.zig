@@ -5,7 +5,6 @@ const std = @import("std");
 pub const Image = struct {
     bitmap: *c.FIBITMAP,
     format: c.FREE_IMAGE_FORMAT,
-    has_palette: bool,
     has_alpha: bool,
     palette: ?Palette,
 
@@ -17,18 +16,14 @@ pub const Image = struct {
 
         const format = c.FreeImage_GetFileType(pathZ, 0);
         const bitmap = c.FreeImage_Load(format, pathZ, 0) orelse return error.ImageOpenError;
-        //const bitmap2 = c.FreeImage_ConvertTo32Bits(bitmap) orelse return error.ImageOpenError;
 
         const color_type = c.FreeImage_GetColorType(bitmap);
 
         var has_alpha: bool = undefined;
-        var has_palette: bool = undefined;
         var palette: ?Palette = null;
 
         switch (color_type) {
             c.FIC_MINISBLACK, c.FIC_MINISWHITE, c.FIC_PALETTE => {
-                has_palette = true;
-                // TODO: Is alpha really false?
                 has_alpha = false;
 
                 palette = Palette{
@@ -37,11 +32,9 @@ pub const Image = struct {
                 };
             },
             c.FIC_RGB => {
-                has_palette = false;
                 has_alpha = false;
             },
             c.FIC_RGBALPHA => {
-                has_palette = false;
                 has_alpha = true;
             },
             c.FIC_CMYK => {
@@ -54,7 +47,6 @@ pub const Image = struct {
         return Image{
             .bitmap = bitmap,
             .format = format,
-            .has_palette = has_palette,
             .has_alpha = has_alpha,
             .palette = palette,
         };
@@ -113,7 +105,8 @@ pub const Palette = struct {
     size: usize,
 
     pub fn getAt(self: Palette, i: usize) Color {
-        const rgb_quad = self.palette[0..self.size][i];
+        const rgb_quad = self.palette[i];
+
         return Color{
             .r = rgb_quad.rgbRed,
             .g = rgb_quad.rgbGreen,
@@ -131,6 +124,10 @@ pub const Color = struct {
     g: u8,
     b: u8,
 };
+
+pub fn getAlphaMask() u32 {
+    return c.FI_RGBA_ALPHA_MASK;
+}
 
 pub fn isSupportedRead(path: []const u8) bool {
     var pathZ = allocator.get().dupeZ(u8, path) catch {
