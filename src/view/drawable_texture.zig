@@ -25,30 +25,7 @@ pub const DrawableTexture = struct {
         defer c.SDL_FreeSurface(surface);
 
         if (image.palette) |image_palette| {
-            var palette_colors = allocator.get().alloc(c.SDL_Color, image_palette.size) catch {
-                unreachable;
-            };
-            defer allocator.get().free(palette_colors);
-
-            var i: usize = 0;
-            while (i < palette_colors.len) {
-                const color = image_palette.getAt(i);
-                palette_colors[i].r = color.r;
-                palette_colors[i].g = color.g;
-                palette_colors[i].b = color.b;
-                i += 1;
-            }
-
-            var result = c.SDL_SetPaletteColors(
-                surface.*.format.*.palette,
-                @ptrCast([*c]const c.SDL_Color, palette_colors),
-                0,
-                @intCast(c_int, palette_colors.len),
-            );
-
-            if (result != 0) {
-                return error.FailedToSetPaletteColors;
-            }
+            try setSurfacePaletteFromImage(surface, image_palette);
         }
 
         var texture = c.SDL_CreateTextureFromSurface(renderer, surface) orelse {
@@ -75,3 +52,30 @@ pub const DrawableTexture = struct {
         };
     }
 };
+
+fn setSurfacePaletteFromImage(surface: *c.SDL_Surface, image_palette: img.Palette) !void {
+    var palette_colors = allocator.get().alloc(c.SDL_Color, image_palette.size) catch {
+        unreachable;
+    };
+    defer allocator.get().free(palette_colors);
+
+    var i: usize = 0;
+    while (i < palette_colors.len) {
+        const color = image_palette.getAt(i);
+        palette_colors[i].r = color.r;
+        palette_colors[i].g = color.g;
+        palette_colors[i].b = color.b;
+        i += 1;
+    }
+
+    var result = c.SDL_SetPaletteColors(
+        surface.*.format.*.palette,
+        @ptrCast([*c]const c.SDL_Color, palette_colors),
+        0,
+        @intCast(c_int, palette_colors.len),
+    );
+
+    if (result != 0) {
+        return error.FailedToSetPaletteColors;
+    }
+}
