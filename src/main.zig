@@ -1,15 +1,16 @@
-const std = @import("std");
-
 const c = @import("c.zig").imported;
 const cli_args = @import("cli_args.zig");
 const img = @import("image.zig");
-const view = @import("view.zig");
+const std = @import("std");
+
+const DrawableTexture = @import("view/drawable_texture.zig").DrawableTexture;
+const ImageView = @import("view/image_view.zig").ImageView;
 
 const App = struct {
     window: *c.SDL_Window,
     renderer: *c.SDL_Renderer,
     running: bool = true,
-    image_view: view.ImageView,
+    image_view: ImageView,
 
     pub fn handleEvents(self: *App) void {
         var event: c.SDL_Event = undefined;
@@ -66,7 +67,7 @@ pub fn main() anyerror!void {
     };
     defer image.unload();
 
-    const texture = view.DrawableTexture.fromImage(renderer, image) catch {
+    const texture = DrawableTexture.fromImage(renderer, image) catch {
         std.debug.warn("Failed to create texture\n", .{});
         return error.InitFailed;
     };
@@ -75,7 +76,7 @@ pub fn main() anyerror!void {
     var app = App{
         .window = window,
         .renderer = renderer,
-        .image_view = view.ImageView{
+        .image_view = ImageView{
             .image = texture,
         },
     };
