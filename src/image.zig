@@ -2,6 +2,20 @@ const allocator = @import("allocator.zig");
 const c = @import("c.zig").imported;
 const std = @import("std");
 
+// TODO: Test more file formats for reading
+const FIFs_supporting_read = [_]c.FREE_IMAGE_FORMAT{
+    c.FIF_JPEG,
+    c.FIF_PNG,
+    c.FIF_GIF,
+};
+
+// TODO: Test more file formats for writing
+const FIFs_supporting_write = [_]c.FREE_IMAGE_FORMAT{
+    c.FIF_JPEG,
+    c.FIF_PNG,
+    c.FIF_GIF,
+};
+
 pub const Image = struct {
     bitmap: *c.FIBITMAP,
     format: c.FREE_IMAGE_FORMAT,
@@ -62,9 +76,41 @@ pub const Image = struct {
         };
         defer allocator.get().free(pathZ);
 
-        var fif = c.FreeImage_GetFIFFromFilename(pathZ);
+        const fif = c.FreeImage_GetFIFFromFilename(pathZ);
+        const bpp = c.FreeImage_GetBPP(self.bitmap);
 
-        _ = c.FreeImage_Save(fif, self.bitmap, pathZ, 0);
+        var cloned_bitmap: [*c]c.FIBITMAP = undefined;
+
+        switch (fif) {
+            c.FIF_JPEG => {
+                if (bpp != 24) {
+                    cloned_bitmap = c.FreeImage_ConvertTo24Bits(self.bitmap);
+                } else {
+                    cloned_bitmap = self.bitmap;
+                }
+            },
+            c.FIF_PNG => {
+                if (bpp != 32) {
+                    cloned_bitmap = c.FreeImage_ConvertTo32Bits(self.bitmap);
+                } else {
+                    cloned_bitmap = self.bitmap;
+                }
+            },
+            c.FIF_GIF => {
+                if (bpp == 24 or bpp == 32) {
+                    cloned_bitmap = c.FreeImage_ColorQuantize(self.bitmap, c.FIQ_WUQUANT);
+                } else {
+                    cloned_bitmap = self.bitmap;
+                }
+            },
+            else => @panic("Saving to this filetype is not supported"),
+        }
+
+        _ = c.FreeImage_Save(fif, cloned_bitmap, pathZ, 0);
+
+        if (cloned_bitmap != self.bitmap) {
+            c.FreeImage_Unload(cloned_bitmap);
+        }
     }
 
     pub fn getWidth(self: Image) c_uint {
@@ -144,7 +190,13 @@ pub fn isSupportedRead(path: []const u8) bool {
     if (fif == c.FIF_UNKNOWN) {
         return false;
     } else {
-        return c.FreeImage_FIFSupportsReading(fif) != 0;
+        var supported_read = false;
+
+        for (FIFs_supporting_read) |supported_fif| {
+            if (supported_fif == fif) supported_read = true;
+        }
+
+        return supported_read and c.FreeImage_FIFSupportsReading(fif) != 0;
     }
 }
 
@@ -159,6 +211,12 @@ pub fn isSupportedWrite(path: []const u8) bool {
     if (fif == c.FIF_UNKNOWN) {
         return false;
     } else {
-        return c.FreeImage_FIFSupportsWriting(fif) != 0;
+        var supported_write = false;
+
+        for (FIFs_supporting_write) |supported_fif| {
+            if (supported_fif == fif) supported_write = true;
+        }
+
+        return supported_write and c.FreeImage_FIFSupportsWriting(fif) != 0;
     }
 }
