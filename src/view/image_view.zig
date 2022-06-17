@@ -10,14 +10,17 @@ pub const ImageView = struct {
     scale: f32 = 1,
     view_width: f32 = 0,
     view_height: f32 = 0,
+    rotation: i32 = 0,
+
+    pub fn setRotation(self: *ImageView, rotation: i32) void {
+        self.rotation = rotation;
+        self.scaleToViewSize();
+    }
 
     pub fn updateViewSize(self: *ImageView, width: i32, height: i32) void {
         self.view_width = @intToFloat(f32, width);
         self.view_height = @intToFloat(f32, height);
-        self.scale = std.math.min(
-            @intToFloat(f32, width) / @intToFloat(f32, self.image.width),
-            @intToFloat(f32, height) / @intToFloat(f32, self.image.height),
-        );
+        self.scaleToViewSize();
     }
 
     pub fn draw(self: ImageView, renderer: *c.SDL_Renderer) void {
@@ -32,9 +35,28 @@ pub const ImageView = struct {
             self.image.texture,
             null,
             &dest_rect,
-            0,
+            @intToFloat(f32, self.rotation),
             null,
-            @intToEnum(c.SDL_RendererFlip, c.SDL_FLIP_VERTICAL),
+            c.SDL_FLIP_VERTICAL,
+        );
+    }
+
+    fn scaleToViewSize(self: *ImageView) void {
+        const swapDimensions = self.rotation == 90 or self.rotation == 270;
+
+        const actual_width = if (swapDimensions)
+            self.image.height
+        else
+            self.image.width;
+
+        const actual_height = if (swapDimensions)
+            self.image.width
+        else
+            self.image.height;
+
+        self.scale = std.math.min(
+            self.view_width / @intToFloat(f32, actual_width),
+            self.view_height / @intToFloat(f32, actual_height),
         );
     }
 };

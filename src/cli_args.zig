@@ -15,17 +15,17 @@ const ArgsError = error{
 };
 
 pub fn readAndParse() ArgsError!Args {
-    const args = std.process.argsAlloc(allocator.get()) catch {
+    const args = std.process.argsAlloc(allocator.get().*) catch {
         std.debug.print("Failed to allocate memory for arguments.\n", .{});
         return ArgsError.AllocationFailed;
     };
 
     if (args.len < 2) {
-        std.debug.print("Input filename is required.\n{}\n", .{usage()});
+        std.debug.print("Input filename is required.\n{s}\n", .{usage()});
         return ArgsError.NoInputFilename;
     }
     if (args.len > 3) {
-        std.debug.print("Too many arguments.\n{}\n", .{usage()});
+        std.debug.print("Too many arguments.\n{s}\n", .{usage()});
         return ArgsError.TooManyArgs;
     }
 
@@ -44,24 +44,24 @@ pub fn readAndParse() ArgsError!Args {
 fn validateArgs(args: Args) bool {
     tryReadFile(args.inputFilename) catch {
         // TODO: different error messages depending on error type?
-        std.debug.print("Failed to open file {}\n", .{args.inputFilename});
+        std.debug.print("Failed to open file {s}\n", .{args.inputFilename});
         return false;
     };
 
     if (!img.isSupportedRead(args.inputFilename)) {
-        std.debug.print("{}: reading is not supported\n", .{args.inputFilename});
+        std.debug.print("{s}: reading is not supported\n", .{args.inputFilename});
         return false;
     }
 
     if (args.outputFilename) |path| {
         if (!tryWriteFile(path)) {
             // TODO: different error messages depending on error type?
-            std.debug.print("Cannot write to file {}\n", .{path});
+            std.debug.print("Cannot write to file {s}\n", .{path});
             return false;
         }
 
         if (!img.isSupportedWrite(path)) {
-            std.debug.print("{}: writing is not supported\n", .{path});
+            std.debug.print("{s}: writing is not supported\n", .{path});
             return false;
         }
     }

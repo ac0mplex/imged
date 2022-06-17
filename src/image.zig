@@ -70,47 +70,35 @@ pub const Image = struct {
         c.FreeImage_Unload(self.bitmap);
     }
 
-    pub fn saveToFile(self: Image, path: []const u8) void {
+    pub fn saveToFile(
+        self: Image,
+        path: []const u8,
+        opt_transform: ?ImageTransform,
+    ) void {
         var pathZ = allocator.get().dupeZ(u8, path) catch {
             unreachable;
         };
         defer allocator.get().free(pathZ);
 
+        var transformed_bitmap = if (opt_transform) |transform|
+            transformBitmap(self.bitmap, transform)
+        else
+            self.bitmap;
+        defer if (transformed_bitmap != self.bitmap) {
+            c.FreeImage_Unload(transformed_bitmap);
+        };
+
         const fif = c.FreeImage_GetFIFFromFilename(pathZ);
-        const bpp = c.FreeImage_GetBPP(self.bitmap);
 
-        var cloned_bitmap: [*c]c.FIBITMAP = undefined;
+        var converted_bitmap = convertIfNecessary(
+            transformed_bitmap,
+            fif,
+        );
+        defer if (converted_bitmap != transformed_bitmap) {
+            c.FreeImage_Unload(converted_bitmap);
+        };
 
-        switch (fif) {
-            c.FIF_JPEG => {
-                if (bpp != 24) {
-                    cloned_bitmap = c.FreeImage_ConvertTo24Bits(self.bitmap);
-                } else {
-                    cloned_bitmap = self.bitmap;
-                }
-            },
-            c.FIF_PNG => {
-                if (bpp != 32) {
-                    cloned_bitmap = c.FreeImage_ConvertTo32Bits(self.bitmap);
-                } else {
-                    cloned_bitmap = self.bitmap;
-                }
-            },
-            c.FIF_GIF => {
-                if (bpp == 24 or bpp == 32) {
-                    cloned_bitmap = c.FreeImage_ColorQuantize(self.bitmap, c.FIQ_WUQUANT);
-                } else {
-                    cloned_bitmap = self.bitmap;
-                }
-            },
-            else => @panic("Saving to this filetype is not supported"),
-        }
-
-        _ = c.FreeImage_Save(fif, cloned_bitmap, pathZ, 0);
-
-        if (cloned_bitmap != self.bitmap) {
-            c.FreeImage_Unload(cloned_bitmap);
-        }
+        _ = c.FreeImage_Save(fif, converted_bitmap, pathZ, 0);
     }
 
     pub fn getWidth(self: Image) c_uint {
@@ -171,6 +159,18 @@ pub const Color = struct {
     b: u8,
 };
 
+pub const ImageTransform = struct {
+    rotation: i32 = 0,
+    scaleX: f32 = 1,
+    scaleY: f32 = 1,
+    cropping_rect: struct {
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+    },
+};
+
 pub fn getAlphaMask() u32 {
     return c.FI_RGBA_ALPHA_MASK;
 }
@@ -189,15 +189,15 @@ pub fn isSupportedRead(path: []const u8) bool {
 
     if (fif == c.FIF_UNKNOWN) {
         return false;
-    } else {
-        var supported_read = false;
-
-        for (FIFs_supporting_read) |supported_fif| {
-            if (supported_fif == fif) supported_read = true;
-        }
-
-        return supported_read and c.FreeImage_FIFSupportsReading(fif) != 0;
     }
+
+    var supported_read = false;
+
+    for (FIFs_supporting_read) |supported_fif| {
+        if (supported_fif == fif) supported_read = true;
+    }
+
+    return supported_read and c.FreeImage_FIFSupportsReading(fif) != 0;
 }
 
 pub fn isSupportedWrite(path: []const u8) bool {
@@ -210,13 +210,69 @@ pub fn isSupportedWrite(path: []const u8) bool {
 
     if (fif == c.FIF_UNKNOWN) {
         return false;
-    } else {
-        var supported_write = false;
-
-        for (FIFs_supporting_write) |supported_fif| {
-            if (supported_fif == fif) supported_write = true;
-        }
-
-        return supported_write and c.FreeImage_FIFSupportsWriting(fif) != 0;
     }
+
+    var supported_write = false;
+
+    for (FIFs_supporting_write) |supported_fif| {
+        if (supported_fif == fif) supported_write = true;
+    }
+
+    return supported_write and c.FreeImage_FIFSupportsWriting(fif) != 0;
+}
+
+fn convertIfNecessary(bitmap: *c.FIBITMAP, format: c.FREE_IMAGE_FORMAT) *c.FIBITMAP {
+    const bpp = c.FreeImage_GetBPP(bitmap);
+
+    var converted_bitmap = switch (format) {
+        c.FIF_JPEG => if (bpp != 24)
+            c.FreeImage_ConvertTo24Bits(bitmap)
+        else
+            bitmap,
+
+        c.FIF_PNG => if (bpp != 32)
+            c.FreeImage_ConvertTo32Bits(bitmap)
+        else
+            bitmap,
+
+        c.FIF_GIF => if (bpp == 24 or bpp == 32)
+            c.FreeImage_ColorQuantize(bitmap, c.FIQ_WUQUANT)
+        else
+            bitmap,
+
+        else => @panic("Saving to this filetype is not supported"),
+    };
+
+    return converted_bitmap;
+}
+
+fn transformBitmap(bitmap: *c.FIBITMAP, transform: ImageTransform) *c.FIBITMAP {
+    const cropping_rect = transform.cropping_rect;
+    var cropped_bitmap = c.FreeImage_CreateView(
+        bitmap,
+        cropping_rect.x,
+        cropping_rect.y,
+        cropping_rect.x + cropping_rect.width,
+        cropping_rect.y + cropping_rect.height,
+    );
+
+    const scaled_width = @intToFloat(f32, cropping_rect.width) * transform.scaleX;
+    const scaled_height = @intToFloat(f32, cropping_rect.height) * transform.scaleY;
+
+    var scaled_bitmap = c.FreeImage_Rescale(
+        cropped_bitmap,
+        @floatToInt(c_int, scaled_width),
+        @floatToInt(c_int, scaled_height),
+        c.FILTER_LANCZOS3,
+    );
+    c.FreeImage_Unload(cropped_bitmap);
+
+    var rotated_bitmap = c.FreeImage_Rotate(
+        scaled_bitmap,
+        @intToFloat(f64, transform.rotation),
+        c.NULL,
+    );
+    c.FreeImage_Unload(scaled_bitmap);
+
+    return rotated_bitmap;
 }

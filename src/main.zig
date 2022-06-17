@@ -11,6 +11,7 @@ const App = struct {
     renderer: *c.SDL_Renderer,
     running: bool = true,
     image_view: ImageView,
+    transform: img.ImageTransform,
 
     pub fn handleEvents(self: *App) void {
         var event: c.SDL_Event = undefined;
@@ -26,6 +27,16 @@ const App = struct {
                     },
                     else => {},
                 },
+                c.SDL_KEYDOWN => switch (event.key.keysym.sym) {
+                    c.SDLK_r => {
+                        if (event.key.keysym.mod & c.KMOD_SHIFT > 0) {
+                            self.rotateImageAntiClockwise();
+                        } else {
+                            self.rotateImageClockwise();
+                        }
+                    },
+                    else => {},
+                },
                 else => {},
             }
         }
@@ -35,6 +46,16 @@ const App = struct {
         _ = c.SDL_RenderClear(self.renderer);
         self.image_view.draw(self.renderer);
         _ = c.SDL_RenderPresent(self.renderer);
+    }
+
+    fn rotateImageClockwise(self: *App) void {
+        self.transform.rotation = @rem(self.transform.rotation + 90, 360);
+        self.image_view.setRotation(self.transform.rotation);
+    }
+
+    fn rotateImageAntiClockwise(self: *App) void {
+        self.transform.rotation = @rem(self.transform.rotation - 90, 360);
+        self.image_view.setRotation(self.transform.rotation);
     }
 };
 
@@ -49,26 +70,37 @@ pub fn main() anyerror!void {
     }
     defer c.SDL_Quit();
 
-    const window = c.SDL_CreateWindow("test", 0, 0, 800, 800, c.SDL_WINDOW_RESIZABLE) orelse {
+    const window = c.SDL_CreateWindow(
+        "test",
+        0,
+        0,
+        800,
+        800,
+        c.SDL_WINDOW_RESIZABLE,
+    ) orelse {
         c.SDL_Log("Failed to create window: %s", c.SDL_GetError());
         return error.InitFailed;
     };
     defer c.SDL_DestroyWindow(window);
 
-    var renderer = c.SDL_CreateRenderer(window, -1, 0) orelse {
+    var renderer = c.SDL_CreateRenderer(
+        window,
+        -1,
+        c.SDL_RENDERER_PRESENTVSYNC,
+    ) orelse {
         c.SDL_Log("Failed to create renderer: %s", c.SDL_GetError());
         return error.InitFailed;
     };
     defer c.SDL_DestroyRenderer(renderer);
 
     const image = img.Image.loadFromFile(args.inputFilename) catch {
-        std.debug.warn("Failed opening {}\n", .{args.inputFilename});
+        std.debug.print("Failed opening {s}\n", .{args.inputFilename});
         return error.InitFailed;
     };
     defer image.unload();
 
     const texture = DrawableTexture.fromImage(renderer, image) catch {
-        std.debug.warn("Failed to create texture\n", .{});
+        std.debug.print("Failed to create texture\n", .{});
         return error.InitFailed;
     };
     defer texture.unload();
@@ -79,6 +111,7 @@ pub fn main() anyerror!void {
         .image_view = ImageView{
             .image = texture,
         },
+        .transform = getDefaultTransformForImage(image),
     };
 
     while (app.running) {
@@ -87,6 +120,20 @@ pub fn main() anyerror!void {
     }
 
     if (args.outputFilename) |path| {
-        image.saveToFile(path);
+        image.saveToFile(
+            path,
+            app.transform,
+        );
     }
+}
+
+fn getDefaultTransformForImage(image: img.Image) img.ImageTransform {
+    return .{
+        .cropping_rect = .{
+            .x = 0,
+            .y = 0,
+            .width = image.getWidth(),
+            .height = image.getHeight(),
+        },
+    };
 }

@@ -60,17 +60,16 @@ fn setSurfacePaletteFromImage(surface: *c.SDL_Surface, image_palette: img.Palett
     defer allocator.get().free(palette_colors);
 
     var i: usize = 0;
-    while (i < palette_colors.len) {
+    while (i < palette_colors.len) : (i += 1) {
         const color = image_palette.getAt(i);
         palette_colors[i].r = color.r;
         palette_colors[i].g = color.g;
         palette_colors[i].b = color.b;
-        i += 1;
     }
 
     var result = c.SDL_SetPaletteColors(
         surface.*.format.*.palette,
-        @ptrCast([*c]const c.SDL_Color, palette_colors),
+        @ptrCast(*const c.SDL_Color, palette_colors),
         0,
         @intCast(c_int, palette_colors.len),
     );
