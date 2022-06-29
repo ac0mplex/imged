@@ -1,6 +1,9 @@
 const allocator = @import("allocator.zig");
-const c = @import("c.zig").imported;
+const c = @import("c.zig");
 const std = @import("std");
+
+const Rectangle = @import("util/rectangle.zig").Rectangle;
+const Vector = @import("util/vector.zig").Vector;
 
 // TODO: Test more file formats for reading
 const FIFs_supporting_read = [_]c.FREE_IMAGE_FORMAT{
@@ -161,14 +164,11 @@ pub const Color = struct {
 
 pub const ImageTransform = struct {
     rotation: i32 = 0,
-    scaleX: f32 = 1,
-    scaleY: f32 = 1,
-    cropping_rect: struct {
-        x: u32,
-        y: u32,
-        width: u32,
-        height: u32,
+    scale: Vector(f64) = .{
+        .x = 1,
+        .y = 1,
     },
+    cropping_rect: Rectangle(u32),
 };
 
 pub fn getAlphaMask() u32 {
@@ -250,26 +250,31 @@ fn transformBitmap(bitmap: *c.FIBITMAP, transform: ImageTransform) *c.FIBITMAP {
     const cropping_rect = transform.cropping_rect;
     var cropped_bitmap = c.FreeImage_CreateView(
         bitmap,
-        cropping_rect.x,
-        cropping_rect.y,
-        cropping_rect.x + cropping_rect.width,
-        cropping_rect.y + cropping_rect.height,
+        cropping_rect.start.x,
+        cropping_rect.start.y,
+        cropping_rect.start.x + cropping_rect.size.x,
+        cropping_rect.start.y + cropping_rect.size.y,
     );
 
-    const scaled_width = @intToFloat(f32, cropping_rect.width) * transform.scaleX;
-    const scaled_height = @intToFloat(f32, cropping_rect.height) * transform.scaleY;
+    const scaled_size = blk: {
+        var size = cropping_rect.size.convert(f64);
+        size.x *= transform.scale.x;
+        size.y *= transform.scale.y;
+        break :blk size;
+    };
 
     var scaled_bitmap = c.FreeImage_Rescale(
         cropped_bitmap,
-        @floatToInt(c_int, scaled_width),
-        @floatToInt(c_int, scaled_height),
+        @floatToInt(c_int, scaled_size.x),
+        @floatToInt(c_int, scaled_size.y),
         c.FILTER_LANCZOS3,
     );
     c.FreeImage_Unload(cropped_bitmap);
 
+    // FreeImage rotates anticlockwise?
     var rotated_bitmap = c.FreeImage_Rotate(
         scaled_bitmap,
-        @intToFloat(f64, transform.rotation),
+        @intToFloat(f64, -transform.rotation),
         c.NULL,
     );
     c.FreeImage_Unload(scaled_bitmap);

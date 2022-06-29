@@ -1,5 +1,5 @@
 const allocator = @import("../allocator.zig");
-const c = @import("../c.zig").imported;
+const c = @import("../c.zig");
 const img = @import("../image.zig");
 const std = @import("std");
 

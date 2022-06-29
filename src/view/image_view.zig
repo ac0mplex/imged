@@ -1,62 +1,95 @@
-const c = @import("../c.zig").imported;
+const c = @import("../c.zig");
 const std = @import("std");
 
+const Angle = @import("../util/angle.zig").Angle;
 const DrawableTexture = @import("drawable_texture.zig").DrawableTexture;
+const Rectangle = @import("../util/rectangle.zig").Rectangle;
+const Transform = @import("transform.zig").Transform;
+const Vector = @import("../util/vector.zig").Vector;
 
 pub const ImageView = struct {
     image: DrawableTexture,
-    position_x: f32 = 0,
-    position_y: f32 = 0,
-    scale: f32 = 1,
-    view_width: f32 = 0,
-    view_height: f32 = 0,
-    rotation: i32 = 0,
+    transform: Transform,
+    view_size: Vector(i32) = .{},
+
+    pub fn init(image: DrawableTexture) ImageView {
+        return .{
+            .image = image,
+            .transform = .{
+                .origin = .{
+                    .x = @intToFloat(f64, image.width) / 2,
+                    .y = @intToFloat(f64, image.height) / 2,
+                },
+            },
+        };
+    }
 
     pub fn setRotation(self: *ImageView, rotation: i32) void {
-        self.rotation = rotation;
-        self.scaleToViewSize();
+        self.transform.rotation = Angle.fromDegrees(@intToFloat(f32, rotation));
+        self.resetScale();
     }
 
     pub fn updateViewSize(self: *ImageView, width: i32, height: i32) void {
-        self.view_width = @intToFloat(f32, width);
-        self.view_height = @intToFloat(f32, height);
-        self.scaleToViewSize();
+        self.view_size = .{
+            .x = width,
+            .y = height,
+        };
+
+        const view_center = self.view_size.convert(f64).div(2);
+        self.transform.offset = view_center.sub(self.transform.origin);
+
+        self.resetScale();
+    }
+
+    pub fn calcRectangle(self: ImageView) Rectangle(f64) {
+        return self.transform.transform(self.getBaseImageRectangle());
     }
 
     pub fn draw(self: ImageView, renderer: *c.SDL_Renderer) void {
-        var dest_rect = self.image.getSDL_Rect();
-        dest_rect.x = @floatToInt(c_int, self.view_width / 2.0 + (@intToFloat(f32, dest_rect.x) - self.position_x) * self.scale);
-        dest_rect.y = @floatToInt(c_int, self.view_height / 2.0 + (@intToFloat(f32, dest_rect.y) - self.position_y) * self.scale);
-        dest_rect.w = @floatToInt(c_int, @intToFloat(f32, dest_rect.w) * self.scale);
-        dest_rect.h = @floatToInt(c_int, @intToFloat(f32, dest_rect.h) * self.scale);
+        const dest_rect = self.calcBaseSDL_Rect();
 
         _ = c.SDL_RenderCopyEx(
             renderer,
             self.image.texture,
             null,
             &dest_rect,
-            @intToFloat(f32, self.rotation),
+            self.transform.rotation.toDegrees(),
             null,
             c.SDL_FLIP_VERTICAL,
         );
     }
 
-    fn scaleToViewSize(self: *ImageView) void {
-        const swapDimensions = self.rotation == 90 or self.rotation == 270;
+    fn calcBaseSDL_Rect(self: ImageView) c.SDL_Rect {
+        var rect = self.getBaseImageRectangle();
 
-        const actual_width = if (swapDimensions)
-            self.image.height
-        else
-            self.image.width;
+        rect = self.transform.scale(rect);
+        rect = self.transform.translate(rect);
 
-        const actual_height = if (swapDimensions)
-            self.image.width
-        else
-            self.image.height;
+        return rect.toSDLRect();
+    }
 
-        self.scale = std.math.min(
-            self.view_width / @intToFloat(f32, actual_width),
-            self.view_height / @intToFloat(f32, actual_height),
+    fn getBaseImageRectangle(self: ImageView) Rectangle(f64) {
+        // TODO: maybe move that to image.zig?
+        return .{
+            .start = .{
+                .x = 0,
+                .y = 0,
+            },
+            .size = .{
+                .x = @intToFloat(f64, self.image.width),
+                .y = @intToFloat(f64, self.image.height),
+            },
+        };
+    }
+
+    fn resetScale(self: *ImageView) void {
+        const rotated_image = self.transform.rotate(self.getBaseImageRectangle());
+
+        const view_size_float = self.view_size.convert(f64);
+        const scale = std.math.min(
+            view_size_float.x / rotated_image.size.x,
+            view_size_float.y / rotated_image.size.y,
         );
+        self.transform.scaleFactor = .{ .x = scale, .y = scale };
     }
 };

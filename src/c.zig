@@ -1,4 +1,4 @@
-pub const imported = @cImport({
+pub usingnamespace @cImport({
     @cInclude("SDL2/SDL.h");
     @cInclude("FreeImage.h");
 });
