@@ -11,7 +11,7 @@ Usage: imged INPUT_FILE [OUTPUT_FILE]
 * cropping (select cropping area with mouse)
 * rotating (r/R keys)
 
-## Compiling
+## Building
 
 imged has the following dependencies:
 
@@ -19,4 +19,4 @@ imged has the following dependencies:
 * SDL2 >=2.0.22
 * FreeImage >=3.18.0
 
-To compile just run `zig build`, look for the binary in `zig-out/bin/`.
+Just run `zig build` to compile, find the binary in `zig-out/bin/`.
