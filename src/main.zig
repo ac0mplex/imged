@@ -5,6 +5,7 @@ const img = @import("image.zig");
 const std = @import("std");
 
 const App = @import("app.zig").App;
+const Cropping = @import("view/cropping.zig").Cropping;
 const DrawableTexture = @import("view/drawable_texture.zig").DrawableTexture;
 const ImageView = @import("view/image_view.zig").ImageView;
 
@@ -61,12 +62,16 @@ pub fn main() anyerror!void {
     };
     defer texture.unload();
 
+    // It would be nice to move it to app.zig but for some reason
+    // result location semantics don't work in this case ¯\_(ツ)_/¯
     var app = App{
         .window = window,
         .renderer = renderer,
         .image_view = ImageView.init(texture),
-        .transform = getDefaultTransformForImage(image),
+        .transform = img.ImageTransform.defaultForImage(image),
+        .cropping = undefined,
     };
+    app.cropping = Cropping.init(&app.image_view);
 
     while (app.running) {
         app.handleEvents();
@@ -79,19 +84,4 @@ pub fn main() anyerror!void {
             app.transform,
         );
     }
-}
-
-fn getDefaultTransformForImage(image: img.Image) img.ImageTransform {
-    return .{
-        .cropping_rect = .{
-            .start = .{
-                .x = 0,
-                .y = 0,
-            },
-            .size = .{
-                .x = image.getWidth(),
-                .y = image.getHeight(),
-            },
-        },
-    };
 }

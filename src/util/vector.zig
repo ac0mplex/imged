@@ -6,7 +6,7 @@ const Angle = @import("angle.zig").Angle;
 pub fn Vector(comptime T: type) type {
     switch (@typeInfo(T)) {
         .Int, .Float => {},
-        else => @compileError("Vector doesn't support this type"),
+        else => throwNotSupportedTypeError(T),
     }
 
     return struct {
@@ -25,7 +25,7 @@ pub fn Vector(comptime T: type) type {
                     .x = @intToFloat(T, point.x),
                     .y = @intToFloat(T, point.y),
                 },
-                else => @compileError("Vector doesn't support this type"),
+                else => throwNotSupportedTypeError(T),
             };
         }
 
@@ -40,7 +40,7 @@ pub fn Vector(comptime T: type) type {
                         .x = @floatToInt(OtherT, self.x),
                         .y = @floatToInt(OtherT, self.y),
                     },
-                    else => @compileError("Vector doesn't support this type"),
+                    else => throwNotSupportedTypeError(T),
                 },
                 .Float => switch (@typeInfo(T)) {
                     .Int => .{
@@ -51,9 +51,9 @@ pub fn Vector(comptime T: type) type {
                         .x = @floatCast(OtherT, self.x),
                         .y = @floatCast(OtherT, self.y),
                     },
-                    else => @compileError("Vector doesn't support this type"),
+                    else => throwNotSupportedTypeError(T),
                 },
-                else => @compileError("Vector doesn't support this type"),
+                else => throwNotSupportedTypeError(OtherT),
             };
         }
 
@@ -103,4 +103,10 @@ pub fn Vector(comptime T: type) type {
             };
         }
     };
+}
+
+fn throwNotSupportedTypeError(comptime T: type) void {
+    @compileError(
+        std.fmt.format("Vector doesn't support {}", .{@typeName(T)}),
+    );
 }

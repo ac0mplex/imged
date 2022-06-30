@@ -169,6 +169,21 @@ pub const ImageTransform = struct {
         .y = 1,
     },
     cropping_rect: Rectangle(u32),
+
+    pub fn defaultForImage(image: Image) ImageTransform {
+        return .{
+            .cropping_rect = .{
+                .start = .{
+                    .x = 0,
+                    .y = 0,
+                },
+                .size = .{
+                    .x = image.getWidth(),
+                    .y = image.getHeight(),
+                },
+            },
+        };
+    }
 };
 
 pub fn getAlphaMask() u32 {

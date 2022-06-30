@@ -6,7 +6,7 @@ const Vector = @import("vector.zig").Vector;
 pub fn Rectangle(comptime T: type) type {
     switch (@typeInfo(T)) {
         .Int, .Float => {},
-        else => @compileError("Rectangle doesn't support this type"),
+        else => throwNotSupportedTypeError(T),
     }
 
     return struct {
@@ -37,7 +37,7 @@ pub fn Rectangle(comptime T: type) type {
                         .y = @intToFloat(T, sdl_rect.h),
                     },
                 },
-                else => @compileError("Rectangle doesn't support this type"),
+                else => throwNotSupportedTypeError(T),
             };
         }
 
@@ -77,7 +77,7 @@ pub fn Rectangle(comptime T: type) type {
                     .w = @floatToInt(c_int, self.size.x),
                     .h = @floatToInt(c_int, self.size.y),
                 },
-                else => @compileError("Rectangle doesn't support this type"),
+                else => throwNotSupportedTypeError(T),
             };
         }
 
@@ -106,4 +106,10 @@ pub fn Rectangle(comptime T: type) type {
                 point.y <= self.start.y + self.size.y;
         }
     };
+}
+
+fn throwNotSupportedTypeError(comptime T: type) void {
+    @compileError(
+        std.fmt.format("Rectangle doesn't support {}", .{@typeName(T)}),
+    );
 }
