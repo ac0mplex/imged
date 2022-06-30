@@ -23,7 +23,7 @@ pub const CroppingRectangleBuilder = struct {
     }
 
     pub fn updateEndPos(self: *CroppingRectangleBuilder, end_point: Vector(f64)) void {
-        self.start = end_point;
+        self.end = end_point;
     }
 
     pub fn updateTransform(

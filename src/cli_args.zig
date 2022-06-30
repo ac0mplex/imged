@@ -15,7 +15,7 @@ const ArgsError = error{
 };
 
 pub fn readAndParse() ArgsError!Args {
-    const args = std.process.argsAlloc(allocator.get().*) catch {
+    const args = std.process.argsAlloc(allocator.get()) catch {
         std.debug.print("Failed to allocate memory for arguments.\n", .{});
         return ArgsError.AllocationFailed;
     };
