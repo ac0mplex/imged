@@ -30,6 +30,10 @@ pub const ImageView = struct {
     }
 
     pub fn updateViewSize(self: *ImageView, width: i32, height: i32) void {
+        if (width <= 0 or height <= 0) {
+            return;
+        }
+
         self.view_size = .{
             .x = width,
             .y = height,
